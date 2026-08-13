@@ -1,0 +1,77 @@
+{
+  "name": "Heltec Wireless Tracker (ESP32-S3)",
+  "vendor": "Heltec",
+  "url": "https://heltec.org/",
+  "frameworks": ["arduino", "espidf"],
+  "platform": "espressif32",
+
+  "build": {
+    "core": "esp32",
+    "mcu": "esp32s3",
+    "f_cpu": "240000000L",
+    "f_flash": "80000000L",
+    "flash_mode": "qio",
+    "variant": "heltec_wireless_tracker",
+    "arduino": {
+      "ldscript": "esp32s3_out.ld"
+    },
+    "extra_flags": [
+      "-DMCU_ESP32_S3",
+      "-DHELTEC_BOARD=34",
+      "-DWIRELESS_TRACKER",
+      "-DRADIO_CHIP_SX1262",
+      "-DHELTEC_WIRELESS_TRACKER",
+      "-DHELTEC_WIRELESS_TRACKER_V1",
+      "-DHELTEC_WIRELESS_TRACKER_V1_0",
+      "-DHELTEC_WIRELESS_TRACKER_V1_1",
+      "-DHELTEC_WIRELESS_TRACKER_V1_2",
+      "-DHELTEC_WIRELESS_TRACKER_V1_3",
+      "-DHELTEC_WIRELESS_TRACKER_V1_4",
+      "-DHELTEC_WIRELESS_TRACKER_V1_5",
+      "-DHELTEC_WIRELESS_TRACKER_V1_6",
+      "-DHELTEC_WIRELESS_TRACKER_V1_7",
+      "-DHELTEC_WIRELESS_TRACKER_V1_8",
+      "-DHELTEC_WIRELESS_TRACKER_V1_9",
+      "-DHELTEC_WIRELESS_TRACKER_V2",
+      "-DHELTEC_WIRELESS_TRACKER_V2_0",
+      "-DHELTEC_WIRELESS_TRACKER_V2_1",
+      "-DHELTEC_WIRELESS_TRACKER_V2_2",
+      "-DHELTEC_WIRELESS_TRACKER_V2_3",
+      "-DHELTEC_WIRELESS_TRACKER_V2_4",
+      "-DHELTEC_WIRELESS_TRACKER_V2_5",
+      "-DHELTEC_WIRELESS_TRACKER_V2_6",
+      "-DHELTEC_WIRELESS_TRACKER_V2_7",
+      "-DHELTEC_WIRELESS_TRACKER_V2_8",
+      "-DHELTEC_WIRELESS_TRACKER_V2_9",
+      "-DHELTEC_WIRELESS_TRACKER_V3",
+      "-DHELTEC_WIRELESS_TRACKER_V3_0",
+      "-DHELTEC_WIRELESS_TRACKER_V3_1",
+      "-DHELTEC_WIRELESS_TRACKER_V3_2",
+      "-DHELTEC_WIRELESS_TRACKER_V3_3",
+      "-DHELTEC_WIRELESS_TRACKER_V3_4",
+      "-DHELTEC_WIRELESS_TRACKER_V3_5",
+      "-DHELTEC_WIRELESS_TRACKER_V3_6",
+      "-DHELTEC_WIRELESS_TRACKER_V3_7",
+      "-DHELTEC_WIRELESS_TRACKER_V3_8",
+      "-DHELTEC_WIRELESS_TRACKER_V3_9",
+      "-DHELTEC_WIRELESS_TRACKER"
+    ]
+  },
+
+  "upload": {
+    "maximum_size": 3342336,
+    "maximum_ram_size": 327680,
+    "flash_size": "8MB",
+    "speed": 921600,
+    "protocol": "esptool",
+    "protocols": ["esptool", "espota"]
+  },
+
+  "debug": {
+    "default_tool": "esp-builtin",
+    "onboard_tools": ["esp-builtin"],
+    "openocd_target": "esp32s3.cfg"
+  }
+}
+
+

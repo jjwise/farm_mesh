@@ -1,0 +1,147 @@
+name: irrigation-tracker
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: irrigation
+      POSTGRES_USER: irrigation
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U irrigation -d irrigation"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22-openssl
+    restart: unless-stopped
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwords:/mosquitto/config/passwords:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+      - mosquitto_data:/mosquitto/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mosquitto_sub -h 127.0.0.1 -p 1883 -u irrigation-backend -P \"$$(cat /run/secrets/mqtt_backend_password)\" -t '$$SYS/broker/uptime' -C 1 -W 10 >/dev/null",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    secrets:
+      - mqtt_backend_password
+
+  api:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment: &backend-environment
+      IRRIGATION_DATABASE_HOST: postgres
+      IRRIGATION_DATABASE_NAME: irrigation
+      IRRIGATION_DATABASE_USER: irrigation
+      IRRIGATION_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      IRRIGATION_API_TOKEN_FILE: /run/secrets/api_token
+      IRRIGATION_ADMIN_TOKEN_FILE: /run/secrets/admin_token
+    secrets:
+      - postgres_password
+      - api_token
+      - admin_token
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  mqtt-worker:
+    build:
+      context: ../backend
+    command: ["python", "-m", "app.mqtt_worker"]
+    restart: unless-stopped
+    environment:
+      <<: *backend-environment
+      IRRIGATION_MQTT_HOST: mosquitto
+      IRRIGATION_MQTT_PORT: 1883
+      IRRIGATION_MQTT_USERNAME: irrigation-backend
+      IRRIGATION_MQTT_PASSWORD_FILE: /run/secrets/mqtt_backend_password
+      IRRIGATION_MQTT_CLIENT_ID: irrigation-backend
+      IRRIGATION_MQTT_TOPIC: farm/+/lines/+/trackers/+/telemetry
+      IRRIGATION_MQTT_QOS: 1
+      IRRIGATION_MQTT_TLS: "false"
+    secrets:
+      - postgres_password
+      - api_token
+      - admin_token
+      - mqtt_backend_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - private
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../web:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - private
+      - edge
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  mqtt_backend_password:
+    file: ./secrets/mqtt_backend_password.txt
+  api_token:
+    file: ./secrets/api_token.txt
+  admin_token:
+    file: ./secrets/admin_token.txt
+
+networks:
+  private:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  caddy_data:
+  caddy_config:

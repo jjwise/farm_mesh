@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Irrigation Pod Tracker</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app_shell">
+      <aside class="control_panel">
+        <h1>Irrigation Pod Tracker</h1>
+        <p>Dernière position fiable, état des extrémités et historique.</p>
+
+        <label for="api_base">API base URL</label>
+        <input id="api_base" type="text" value="/api" />
+
+        <label for="line_select">Ligne</label>
+        <select id="line_select"></select>
+
+        <label for="snapshot_at">Snapshot @</label>
+        <input id="snapshot_at" type="datetime-local" />
+
+        <label for="history_from">Historique de</label>
+        <input id="history_from" type="datetime-local" />
+
+        <label for="history_to">Historique a</label>
+        <input id="history_to" type="datetime-local" />
+
+        <div class="button_row">
+          <button id="refresh_lines">Charger lignes</button>
+          <button id="load_snapshot">Snapshot</button>
+          <button id="load_history">Historique</button>
+        </div>
+
+        <label class="checkbox_row">
+          <input id="show_heatmap" type="checkbox" checked />
+          Afficher la densité des mesures
+        </label>
+
+        <pre id="status_panel"></pre>
+      </aside>
+
+      <main class="map_panel">
+        <div id="map"></div>
+      </main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
