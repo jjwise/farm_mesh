@@ -22,6 +22,9 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2.0.22-openssl
+    # Keep Mosquitto's official UID for its named data volume, while using the
+    # invoking host user's group to read private bind-mounted credentials.
+    user: "1883:${IRRIGATION_HOST_GID:-1000}"
     restart: unless-stopped
     ports:
       - "8883:8883"
@@ -33,6 +36,7 @@ services:
       - mosquitto_data:/mosquitto/data
     networks:
       - private
+      - edge
     healthcheck:
       test:
         [
@@ -48,6 +52,7 @@ services:
   api:
     build:
       context: ../backend
+    user: "${IRRIGATION_HOST_UID:-1000}:${IRRIGATION_HOST_GID:-1000}"
     restart: unless-stopped
     environment: &backend-environment
       IRRIGATION_DATABASE_HOST: postgres
@@ -80,6 +85,7 @@ services:
   mqtt-worker:
     build:
       context: ../backend
+    user: "${IRRIGATION_HOST_UID:-1000}:${IRRIGATION_HOST_GID:-1000}"
     command: ["python", "-m", "app.mqtt_worker"]
     restart: unless-stopped
     environment:

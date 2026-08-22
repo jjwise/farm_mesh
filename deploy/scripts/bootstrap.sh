@@ -12,6 +12,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DEPLOY_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 SECRETS_DIR="$DEPLOY_DIR/secrets"
 CERTS_DIR="$DEPLOY_DIR/mosquitto/certs"
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
 CA_KEY="$SECRETS_DIR/mqtt_ca.key"
 LEGACY_CA_KEY="$CERTS_DIR/ca.key"
 CERT_DNS_FILE="$DEPLOY_DIR/generated/mqtt_dns_name"
@@ -96,16 +98,26 @@ BACKEND_PASSWORD=$(tr -d '\r\n' < "$SECRETS_DIR/mqtt_backend_password.txt")
 PASSWORD_FILE="$DEPLOY_DIR/mosquitto/passwords"
 
 docker run --rm \
+  --user "$HOST_UID:$HOST_GID" \
   -v "$DEPLOY_DIR/mosquitto:/mosquitto/config" \
   --entrypoint mosquitto_passwd \
   eclipse-mosquitto:2.0.22-openssl \
   -b -c /mosquitto/config/passwords irrigation-gateway "$GATEWAY_PASSWORD"
 docker run --rm \
+  --user "$HOST_UID:$HOST_GID" \
   -v "$DEPLOY_DIR/mosquitto:/mosquitto/config" \
   --entrypoint mosquitto_passwd \
   eclipse-mosquitto:2.0.22-openssl \
   -b /mosquitto/config/passwords irrigation-backend "$BACKEND_PASSWORD"
-chmod 600 "$PASSWORD_FILE"
+chmod 750 "$CERTS_DIR"
+chmod 640 \
+  "$PASSWORD_FILE" \
+  "$DEPLOY_DIR/mosquitto/acl" \
+  "$DEPLOY_DIR/mosquitto/mosquitto.conf" \
+  "$SECRETS_DIR/mqtt_backend_password.txt" \
+  "$CERTS_DIR/ca.crt" \
+  "$CERTS_DIR/server.crt" \
+  "$CERTS_DIR/server.key"
 
 WEB_PASSWORD=$(tr -d '\r\n' < "$SECRETS_DIR/web_password.txt")
 WEB_HASH=$(docker run --rm caddy:2.10-alpine caddy hash-password --plaintext "$WEB_PASSWORD")
@@ -113,6 +125,8 @@ WEB_HASH=$(docker run --rm caddy:2.10-alpine caddy hash-password --plaintext "$W
   printf 'IRRIGATION_SITE_ADDRESS=%s\n' "$DASHBOARD_DNS_NAME"
   printf 'IRRIGATION_WEB_USERNAME=irrigation\n'
   printf "IRRIGATION_WEB_PASSWORD_HASH='%s'\n" "$WEB_HASH"
+  printf 'IRRIGATION_HOST_UID=%s\n' "$HOST_UID"
+  printf 'IRRIGATION_HOST_GID=%s\n' "$HOST_GID"
 } > "$DEPLOY_DIR/.env"
 
 echo "Bootstrap complete."
