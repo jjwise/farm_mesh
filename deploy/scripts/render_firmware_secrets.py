@@ -31,9 +31,7 @@ def main() -> None:
         "#define IRRIGATION_MQTT_PORT 8883\n"
         '#define IRRIGATION_MQTT_USERNAME "irrigation-gateway"\n'
         f"#define IRRIGATION_MQTT_PASSWORD {cpp_string(password)}\n"
-        '#define IRRIGATION_MQTT_CA_CERT R"IRRIGATION_CA(\n'
-        f"{ca_pem}"
-        ')IRRIGATION_CA"\n'
+        f"#define IRRIGATION_MQTT_CA_CERT {cpp_string(ca_pem)}\n"
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(output, encoding="utf-8", newline="\n")
