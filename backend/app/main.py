@@ -5,18 +5,20 @@ from sqlalchemy import text
 
 from app.api.ingest import router as ingest_router
 from app.api.lines import router as lines_router
+from app.api.nodes import router as nodes_router
 from app.config import settings
-from app.database import Base, engine
+from app.database import engine, initialize_schema
 
 
 def create_app() -> FastAPI:
     """Build the FastAPI application and initialize schema."""
 
-    Base.metadata.create_all(bind=engine)
+    initialize_schema()
 
     app = FastAPI(title=settings.app_name, version="0.1.0")
     app.include_router(ingest_router)
     app.include_router(lines_router)
+    app.include_router(nodes_router)
 
     @app.get("/healthz", tags=["system"])
     def health_check() -> dict[str, str]:

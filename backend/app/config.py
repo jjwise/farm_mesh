@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     mqtt_tls: bool = False
     mqtt_ca_file: str = ""
     mqtt_keepalive_seconds: int = 60
+    mqtt_command_qos: int = 1
+    mqtt_publish_timeout_seconds: int = 5
+    command_ttl_seconds: int = 120
+    command_retry_seconds: int = 10
+    command_hmac_key: str = ""
+    command_hmac_key_file: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="IRRIGATION_")
 
@@ -73,6 +79,10 @@ class Settings(BaseSettings):
     @property
     def resolved_mqtt_password(self) -> str:
         return read_secret(self.mqtt_password, self.mqtt_password_file)
+
+    @property
+    def resolved_command_hmac_key(self) -> str:
+        return read_secret(self.command_hmac_key, self.command_hmac_key_file)
 
 
 settings = Settings()

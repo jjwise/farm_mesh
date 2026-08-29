@@ -4,49 +4,49 @@ Implementation v1 for a multi-hop irrigation pod tracking system with:
 
 - **Firmware profiles** on Heltec Wireless Tracker:
   - `ENDPOINT_POD`
+  - `BASIC_TRACKER`
+  - `VALVE_ACTUATOR`
   - `RELAY_FIXED`
   - `GATEWAY_CENTRAL`
-- **MQTT ingestion worker** with QoS 1 and idempotent PostgreSQL writes.
-- **Backend API** (FastAPI) for line registry, history, snapshot, interpolation.
-- **Web map UI** for timeline/history and coverage heatmap.
+- **MQTT worker** with QoS 1, idempotent PostgreSQL writes, and command retries.
+- **Backend API** (FastAPI) for nodes, commands, line registry, history, snapshot, and interpolation.
+- **Unified web map** with profile filters/sorting, pod heat layer, tracker settings, and valve controls.
 - **Self-hosted stack** with Mosquitto TLS, PostgreSQL, Caddy HTTPS, API and web UI.
 
 ## Repository structure
 
-- `src/firmware/`: firmware runtime and role-specific logic
-- `include/project_config.h`: compile-time defaults for node identity and gateway uplink
-- `platformio.ini`: PlatformIO environments for each firmware profile
-- `backend/`: FastAPI service and interpolation logic
-- `web/`: static frontend map UI
-- `deploy/`: hardened Docker Compose deployment for a home server
-- `docs/meshtastic_integration_notes.md`: where to plug real Meshtastic transport
-- `meshtastic_overlay/`: isolated module scaffold to port into Meshtastic fork
+- `../meshtastic_fork/`: source of truth for every deployed firmware profile.
+- `backend/`: FastAPI, PostgreSQL models, MQTT ingestion, and command outbox.
+- `web/`: unified static map and role-specific controls.
+- `deploy/`: hardened Docker Compose deployment for a home server.
+- `src/firmware/` and `meshtastic_overlay/`: legacy prototypes; do not deploy them.
 
 ## Firmware build targets
 
 ```bash
-pio run -e endpoint_pod
-pio run -e relay_fixed
-pio run -e gateway_central
+cd ../meshtastic_fork
+pio run -e hwt_tracker
+pio run -e hwt_valve
+pio run -e hwt_gw
 ```
 
 ## Notes
 
-- Mesh transport currently uses a dedicated abstraction in `src/firmware/mesh_transport.*`.
-  Hook Meshtastic module internals there to preserve backend/web contracts unchanged.
-- Gateway uplink uses verified TLS and QoS 1; `msg_id` is also unique in PostgreSQL for application-level idempotence.
+- Gateway uplink uses verified TLS and QoS 1; `msg_id` is unique in PostgreSQL for application-level idempotence.
+- Commands are non-retained, expire after a short TTL, and are retried until an ACK/rejection or expiry.
+- Valve opening requires valid node time and a bounded duration; the node closes automatically.
+- GPIO4 on the Heltec profile drives only a protected logic-level MOSFET/driver input, never a solenoid directly.
 - `GET /v1/line/{line_id}/snapshot` computes pod interpolation using `pod_count` + `pod_spacing_m`.
-- For clean fork maintenance, prefer porting logic from this repo into `meshtastic_overlay/src/modules/irrigation/*`.
 
 ## Recommended self-hosted architecture
 
 ```text
-Endpoint pods --LoRa--> Meshtastic gateway --MQTT/TLS:8883--> Mosquitto
-                                                              |
-                                                      MQTT worker (QoS 1)
-                                                              |
-                                                         PostgreSQL
-                                                              |
+Pods / trackers / valves <--LoRa--> Meshtastic gateway <--MQTT/TLS:8883--> Mosquitto
+                                                                           |
+                                                          telemetry + command worker
+                                                                           |
+                                                                      PostgreSQL
+                                                                           |
 Internet --HTTPS:443--> Caddy --private network--> FastAPI + static web UI
 ```
 

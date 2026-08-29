@@ -1,6 +1,8 @@
 user irrigation-gateway
 topic write farm/farm_01/lines/+/trackers/+/telemetry
+topic read farm/farm_01/nodes/+/commands
 
 user irrigation-backend
 topic read farm/+/lines/+/trackers/+/telemetry
+topic write farm/+/nodes/+/commands
 topic read $SYS/broker/uptime

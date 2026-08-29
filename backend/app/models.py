@@ -46,6 +46,37 @@ class TrackerModel(Base):
     line = relationship("LineModel", back_populates="trackers")
 
 
+class NodeStateModel(Base):
+    """Latest role-specific state reported by a node."""
+
+    __tablename__ = "node_states"
+
+    tracker_id = Column(String(128), primary_key=True)
+    valve_open = Column(Boolean, nullable=True)
+    position_interval_sec = Column(Integer, nullable=True)
+    last_command_id = Column(String(128), nullable=False, default="")
+    last_command_status = Column(String(32), nullable=False, default="")
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+
+
+class NodeCommandModel(Base):
+    """Auditable command outbox and acknowledgement state."""
+
+    __tablename__ = "node_commands"
+
+    command_id = Column(String(128), primary_key=True)
+    farm_id = Column(String(128), index=True, nullable=False)
+    tracker_id = Column(String(128), index=True, nullable=False)
+    action = Column(String(64), nullable=False)
+    payload_json = Column(Text, nullable=False)
+    status = Column(String(32), index=True, nullable=False, default="PENDING")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    expires_at = Column(DateTime(timezone=True), index=True, nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    error_message = Column(Text, nullable=False, default="")
+
+
 class TelemetryEventModel(Base):
     """Raw telemetry event from mesh/gateway ingestion."""
 

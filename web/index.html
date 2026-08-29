@@ -3,51 +3,87 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Irrigation Pod Tracker</title>
+    <title>Réseau terrain</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./dashboard.css" />
   </head>
   <body>
     <div class="app_shell">
       <aside class="control_panel">
-        <h1>Irrigation Pod Tracker</h1>
-        <p>Dernière position fiable, état des extrémités et historique.</p>
+        <header class="brand">
+          <span class="eyebrow">WISETHINGS · TERRAIN</span>
+          <h1>Réseau irrigation</h1>
+          <p>Pods, trackers et vannes sur une carte commune.</p>
+        </header>
 
-        <label for="api_base">API base URL</label>
-        <input id="api_base" type="text" value="/api" />
+        <details class="connection_settings">
+          <summary>Connexion</summary>
+          <label for="api_base">API</label>
+          <input id="api_base" type="text" value="/api" />
+          <label for="admin_token">Jeton administrateur</label>
+          <input id="admin_token" type="password" autocomplete="off" placeholder="Requis pour commander" />
+        </details>
 
-        <label for="line_select">Ligne</label>
-        <select id="line_select"></select>
+        <section>
+          <div class="section_heading">
+            <h2>Nœuds</h2>
+            <button id="refresh_all" class="quiet_button">Actualiser</button>
+          </div>
+          <div class="filter_grid" id="profile_filters">
+            <label><input type="checkbox" value="ENDPOINT_POD" checked /> Pods</label>
+            <label><input type="checkbox" value="BASIC_TRACKER" checked /> Trackers</label>
+            <label><input type="checkbox" value="VALVE_ACTUATOR" checked /> Vannes</label>
+            <label><input type="checkbox" value="INFRASTRUCTURE" checked /> Infrastructure</label>
+          </div>
+          <label for="node_sort">Trier par</label>
+          <select id="node_sort">
+            <option value="recent">Activité récente</option>
+            <option value="profile">Type</option>
+            <option value="name">Identifiant</option>
+            <option value="battery">Batterie</option>
+          </select>
+          <div id="node_list" class="node_list"></div>
+        </section>
 
-        <label for="snapshot_at">Snapshot @</label>
-        <input id="snapshot_at" type="datetime-local" />
+        <section>
+          <h2>Lignes et historique</h2>
+          <label for="line_select">Ligne</label>
+          <select id="line_select"></select>
+          <div class="date_grid">
+            <label>De<input id="history_from" type="datetime-local" /></label>
+            <label>À<input id="history_to" type="datetime-local" /></label>
+          </div>
+          <button id="load_history">Afficher l’historique</button>
+        </section>
 
-        <label for="history_from">Historique de</label>
-        <input id="history_from" type="datetime-local" />
+        <section id="node_detail" class="node_detail empty">
+          <h2>Détail du nœud</h2>
+          <p>Sélectionnez un nœud sur la carte ou dans la liste.</p>
+        </section>
 
-        <label for="history_to">Historique a</label>
-        <input id="history_to" type="datetime-local" />
-
-        <div class="button_row">
-          <button id="refresh_lines">Charger lignes</button>
-          <button id="load_snapshot">Snapshot</button>
-          <button id="load_history">Historique</button>
-        </div>
-
-        <label class="checkbox_row">
-          <input id="show_heatmap" type="checkbox" checked />
-          Afficher la densité des mesures
-        </label>
-
-        <pre id="status_panel"></pre>
+        <section class="status_section">
+          <h2>État</h2>
+          <pre id="status_panel">Initialisation…</pre>
+        </section>
       </aside>
 
       <main class="map_panel">
+        <div class="map_header">
+          <div>
+            <span class="eyebrow">VUE D’ENSEMBLE</span>
+            <strong id="map_summary">Chargement…</strong>
+          </div>
+          <div class="legend">
+            <span><i class="dot pod"></i>Pod</span>
+            <span><i class="dot tracker"></i>Tracker</span>
+            <span><i class="dot valve"></i>Vanne</span>
+          </div>
+        </div>
         <div id="map"></div>
       </main>
     </div>
@@ -57,7 +93,7 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-    <script src="./app.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="./dashboard.js"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import LineModel, TelemetryEventModel, TrackerModel
+from app.models import LineModel, NodeCommandModel, NodeStateModel, TelemetryEventModel, TrackerModel
 from app.schemas import TelemetryEventIn
 
 
@@ -30,26 +30,51 @@ def ensure_tracker(db: Session, event: TelemetryEventIn) -> TrackerModel:
         if tracker.line_id != event.line_id:
             tracker.line_id = event.line_id
         tracker.endpoint_role = event.endpoint_role.upper()
+        tracker.node_profile = event.node_profile.upper()
         return tracker
 
     endpoint_role = event.endpoint_role.upper()
-    node_profile = "ENDPOINT_POD"
-    if endpoint_role == "RELAY_FIXED":
-        node_profile = "RELAY_FIXED"
-    elif endpoint_role == "GATEWAY_CENTRAL":
-        node_profile = "GATEWAY_CENTRAL"
-
     tracker = TrackerModel(
         tracker_id=event.tracker_id,
         line_id=event.line_id,
         endpoint_role=endpoint_role,
-        node_profile=node_profile,
+        node_profile=event.node_profile.upper(),
         default_hop_limit=3,
         max_hop_override=5,
     )
     db.add(tracker)
     db.flush()
     return tracker
+
+
+def update_node_state(db: Session, event: TelemetryEventIn) -> None:
+    """Apply optional role-specific state and command acknowledgement."""
+
+    state = db.query(NodeStateModel).filter(NodeStateModel.tracker_id == event.tracker_id).one_or_none()
+    if state is None:
+        state = NodeStateModel(tracker_id=event.tracker_id)
+        db.add(state)
+
+    if event.valve_open is not None:
+        state.valve_open = event.valve_open
+    if event.position_interval_sec is not None:
+        state.position_interval_sec = event.position_interval_sec
+    state.updated_at = datetime.now(timezone.utc)
+
+    if event.command_id and event.command_status:
+        state.last_command_id = event.command_id
+        state.last_command_status = event.command_status
+        command = (
+            db.query(NodeCommandModel)
+            .filter(
+                NodeCommandModel.command_id == event.command_id,
+                NodeCommandModel.tracker_id == event.tracker_id,
+            )
+            .one_or_none()
+        )
+        if command is not None:
+            command.status = event.command_status
+            command.acknowledged_at = datetime.now(timezone.utc)
 
 
 def ingest_event(db: Session, event: TelemetryEventIn) -> bool:
@@ -82,6 +107,7 @@ def ingest_event(db: Session, event: TelemetryEventIn) -> bool:
         mqtt_topic=event.mqtt_topic,
     )
     db.add(model)
+    update_node_state(db, event)
     try:
         db.commit()
         return True

@@ -61,10 +61,20 @@ services:
       IRRIGATION_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
       IRRIGATION_API_TOKEN_FILE: /run/secrets/api_token
       IRRIGATION_ADMIN_TOKEN_FILE: /run/secrets/admin_token
+      IRRIGATION_MQTT_HOST: mosquitto
+      IRRIGATION_MQTT_PORT: 1883
+      IRRIGATION_MQTT_USERNAME: irrigation-backend
+      IRRIGATION_MQTT_PASSWORD_FILE: /run/secrets/mqtt_backend_password
+      IRRIGATION_MQTT_CLIENT_ID: irrigation-backend
+      IRRIGATION_MQTT_TLS: "false"
+      IRRIGATION_COMMAND_RETRY_SECONDS: 10
+      IRRIGATION_COMMAND_HMAC_KEY_FILE: /run/secrets/command_hmac_key
     secrets:
       - postgres_password
       - api_token
       - admin_token
+      - mqtt_backend_password
+      - command_hmac_key
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,6 +108,7 @@ services:
       IRRIGATION_MQTT_TOPIC: farm/+/lines/+/trackers/+/telemetry
       IRRIGATION_MQTT_QOS: 1
       IRRIGATION_MQTT_TLS: "false"
+      IRRIGATION_COMMAND_HMAC_KEY_FILE: ""
     secrets:
       - postgres_password
       - api_token
@@ -107,6 +118,8 @@ services:
       postgres:
         condition: service_healthy
       mosquitto:
+        condition: service_healthy
+      api:
         condition: service_healthy
     networks:
       - private
@@ -140,6 +153,8 @@ secrets:
     file: ./secrets/api_token.txt
   admin_token:
     file: ./secrets/admin_token.txt
+  command_hmac_key:
+    file: ./secrets/command_hmac_key.txt
 
 networks:
   private:

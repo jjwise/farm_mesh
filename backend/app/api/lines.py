@@ -33,6 +33,8 @@ def require_admin_token(x_admin_token: Annotated[str | None, Header()] = None) -
 def to_epoch_ms(value: datetime) -> int:
     """Convert datetime to unix epoch milliseconds."""
 
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
     return int(value.timestamp() * 1000)
 
 

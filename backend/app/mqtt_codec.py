@@ -21,9 +21,14 @@ PUBLISH_REASONS = {
     "P": "POST_MOVE_FIX",
     "C": "SETTLE_CONFIRM",
     "X": "MOTION_DETECTED_NO_FIX",
+    "T": "PERIODIC_POSITION",
+    "V": "VALVE_STATE",
+    "A": "COMMAND_ACK",
+    "R": "COMMAND_REJECTED",
 }
 MOTION_STATES = {"M": "MOVING", "S": "STATIONARY"}
 TIME_QUALITIES = {"G": "GNSS", "R": "RTC", "U": "UNKNOWN"}
+NODE_PROFILES = {"ENDPOINT_POD", "BASIC_TRACKER", "VALVE_ACTUATOR", "RELAY_FIXED", "GATEWAY_CENTRAL"}
 
 
 class InvalidMqttMessage(ValueError):
@@ -75,6 +80,20 @@ def normalize_mqtt_message(
     if device_ts < MIN_VALID_EPOCH_MS:
         time_quality = "UNKNOWN"
 
+    endpoint_role = str(raw.get("e", raw.get("endpoint_role", ""))).upper()
+    inferred_profile = "ENDPOINT_POD"
+    if endpoint_role == "RELAY_FIXED":
+        inferred_profile = "RELAY_FIXED"
+    elif endpoint_role == "GATEWAY_CENTRAL":
+        inferred_profile = "GATEWAY_CENTRAL"
+    node_profile = str(raw.get("n", raw.get("node_profile", inferred_profile))).upper()
+    if node_profile not in NODE_PROFILES:
+        raise InvalidMqttMessage("unknown node_profile")
+    publish_reason = PUBLISH_REASONS.get(
+        str(raw.get("p", raw.get("publish_reason", "H"))).upper(),
+        str(raw.get("publish_reason", "HEARTBEAT")).upper(),
+    )
+
     data = {
         "msg_id": str(raw.get("i", raw.get("msg_id", ""))),
         "ts_utc_ms": effective_ts,
@@ -82,11 +101,9 @@ def normalize_mqtt_message(
         "farm_id": topic_values["farm_id"],
         "tracker_id": tracker_id,
         "line_id": line_id,
-        "endpoint_role": str(raw.get("e", raw.get("endpoint_role", ""))).upper(),
-        "publish_reason": PUBLISH_REASONS.get(
-            str(raw.get("p", raw.get("publish_reason", "H"))).upper(),
-            str(raw.get("publish_reason", "HEARTBEAT")).upper(),
-        ),
+        "endpoint_role": endpoint_role,
+        "node_profile": node_profile,
+        "publish_reason": publish_reason,
         "lat": float(raw.get("a", raw.get("lat", 0.0))),
         "long": float(raw.get("o", raw.get("long", raw.get("lon", 0.0)))),
         "hdop": float(raw.get("hdop", 0.0)),
@@ -103,6 +120,18 @@ def normalize_mqtt_message(
         "time_quality": time_quality,
         "hop_count": int(raw.get("h", raw.get("hop_count", 0)) or 0),
         "mqtt_topic": topic,
+        "command_id": str(raw.get("c", raw.get("command_id", ""))),
+        "valve_open": (
+            _bool_value(raw.get("w", raw.get("valve_open")))
+            if "w" in raw or "valve_open" in raw
+            else None
+        ),
+        "position_interval_sec": raw.get("u", raw.get("position_interval_sec")),
+        "command_status": (
+            "ACKED" if publish_reason == "COMMAND_ACK"
+            else "REJECTED" if publish_reason == "COMMAND_REJECTED"
+            else ""
+        ),
     }
     if not data["msg_id"] or not data["endpoint_role"]:
         raise InvalidMqttMessage("msg_id and endpoint_role are required")

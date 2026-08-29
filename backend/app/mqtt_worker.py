@@ -2,12 +2,15 @@
 
 import logging
 import ssl
+import time
+from datetime import datetime, timedelta, timezone
 
 import paho.mqtt.client as mqtt
-
 from app.config import settings
-from app.database import Base, engine, session_local
+from app.database import initialize_schema, session_local
+from app.models import NodeCommandModel, NodeStateModel
 from app.mqtt_codec import InvalidMqttMessage, normalize_mqtt_message
+from app.services.commands import validate_topic_segment
 from app.services.ingestion import ingest_event
 
 logging.basicConfig(
@@ -89,14 +92,87 @@ def build_client() -> mqtt.Client:
     return client
 
 
-def main() -> None:
-    """Create the schema and consume MQTT forever."""
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
-    Base.metadata.create_all(bind=engine)
+
+def retry_node_commands(client: mqtt.Client) -> None:
+    """Retry the audited command outbox until a node acknowledges or the TTL expires."""
+
+    now = datetime.now(timezone.utc)
+    retry_before = now - timedelta(seconds=settings.command_retry_seconds)
+    db = session_local()
+    try:
+        active = (
+            db.query(NodeCommandModel)
+            .filter(NodeCommandModel.status.in_(("PENDING", "SENT")))
+            .order_by(NodeCommandModel.created_at.asc())
+            .limit(100)
+            .all()
+        )
+        for command in active:
+            if _as_utc(command.expires_at) <= now:
+                command.status = "EXPIRED"
+                state = db.query(NodeStateModel).filter_by(tracker_id=command.tracker_id).one_or_none()
+                if state is not None and state.last_command_id == command.command_id:
+                    state.last_command_status = "EXPIRED"
+                continue
+
+            sent_at = _as_utc(command.sent_at) if command.sent_at else None
+            if not client.is_connected() or (sent_at is not None and sent_at > retry_before):
+                continue
+
+            try:
+                validate_topic_segment(command.farm_id, "farm_id")
+                validate_topic_segment(command.tracker_id, "tracker_id")
+                topic = f"farm/{command.farm_id}/nodes/{command.tracker_id}/commands"
+                result = client.publish(
+                    topic,
+                    command.payload_json,
+                    qos=settings.mqtt_command_qos,
+                    retain=False,
+                )
+                if result.rc != mqtt.MQTT_ERR_SUCCESS:
+                    raise RuntimeError(f"MQTT publish returned {result.rc}")
+                result.wait_for_publish(timeout=settings.mqtt_publish_timeout_seconds)
+                if not result.is_published():
+                    raise TimeoutError("MQTT command retry timed out")
+                command.status = "SENT"
+                command.sent_at = now
+                command.error_message = ""
+                state = db.query(NodeStateModel).filter_by(tracker_id=command.tracker_id).one_or_none()
+                if state is not None and state.last_command_id == command.command_id:
+                    state.last_command_status = "SENT"
+                logger.info("Retried command id=%s target=%s", command.command_id, command.tracker_id)
+            except ValueError as exc:
+                command.status = "FAILED"
+                command.error_message = str(exc)[:500]
+            except Exception as exc:
+                command.error_message = str(exc)[:500]
+                logger.warning("Command retry failed id=%s: %s", command.command_id, exc)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Command outbox maintenance failed")
+    finally:
+        db.close()
+
+
+def main() -> None:
+    """Create the schema, ingest telemetry, and maintain the command outbox."""
+
+    initialize_schema()
     client = build_client()
     logger.info("Connecting to MQTT %s:%d", settings.mqtt_host, settings.mqtt_port)
     client.connect(settings.mqtt_host, settings.mqtt_port, settings.mqtt_keepalive_seconds)
-    client.loop_forever(retry_first_connection=True)
+    client.loop_start()
+    try:
+        while True:
+            retry_node_commands(client)
+            time.sleep(max(1, settings.command_retry_seconds))
+    finally:
+        client.disconnect()
+        client.loop_stop()
 
 
 if __name__ == "__main__":

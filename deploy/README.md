@@ -38,7 +38,7 @@ hashed Mosquitto credentials, database/API tokens, and a Caddy password hash.
 Back up `secrets/` (including `mqtt_ca.key`) and the Docker volumes offline.
 The CA private key must never be copied to a gateway.
 
-## Generate the gateway header
+## Generate the firmware headers
 
 Run this from the repository root, substituting the Wi-Fi details:
 
@@ -48,12 +48,38 @@ python3 deploy/scripts/render_firmware_secrets.py \
   --wifi-password 'replace-me' \
   --mqtt-host 'mqtt.example.net' \
   --mqtt-password-file deploy/secrets/mqtt_gateway_password.txt \
+  --command-hmac-key-file deploy/secrets/command_hmac_key.txt \
   --ca-file deploy/mosquitto/certs/ca.crt \
-  --output ../meshtastic_fork/src/modules/irrigation/IrrigationGatewaySecrets.generated.h
+  --output ../meshtastic_fork/src/modules/irrigation/IrrigationGatewaySecrets.generated.h \
+  --command-output ../meshtastic_fork/src/modules/irrigation/IrrigationCommandSecrets.generated.h
 ```
 
-The generated file is intentionally ignored by Git. Build and flash `hwt_gw`
-after generating it. Keep the gateway username restricted to publish-only ACLs.
+Both generated files are intentionally ignored by Git. The gateway file holds
+only its Wi-Fi/MQTT credentials and CA. The command file holds only the HMAC key
+shared with the API, so unsigned or modified commands are rejected before
+actuation without exposing the gateway credentials to controlled nodes. Deploy
+the signing API first, then rebuild and flash `hwt_tracker` and `hwt_valve`.
+Rebuild `hwt_gw` when its credentials, CA, or firmware change; the gateway
+does not receive the command key. Its broker ACL is restricted to telemetry
+writes and command reads for `farm_01`.
+
+## Upgrade an existing server
+
+After pulling these changes, the tracked ACL and containers must be reloaded:
+
+```sh
+./scripts/bootstrap.sh mqtt.example.net tracker.example.net
+docker compose config
+docker compose up -d --build --force-recreate mosquitto api mqtt-worker caddy
+docker compose logs --tail=100 mosquitto api mqtt-worker
+```
+
+Substitute the two real DNS names. The idempotent bootstrap creates the missing
+command key without rotating existing secrets or the CA.
+
+API startup performs the idempotent database upgrade for `trackers.node_profile`.
+Back up PostgreSQL first. The MQTT worker republishes pending commands every 10
+seconds until an ACK/rejection arrives or the command expires.
 
 ## Security and operations
 

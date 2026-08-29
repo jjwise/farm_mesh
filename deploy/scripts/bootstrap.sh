@@ -43,6 +43,7 @@ create_secret "$SECRETS_DIR/mqtt_gateway_password.txt"
 create_secret "$SECRETS_DIR/mqtt_backend_password.txt"
 create_secret "$SECRETS_DIR/api_token.txt"
 create_secret "$SECRETS_DIR/admin_token.txt"
+create_secret "$SECRETS_DIR/command_hmac_key.txt"
 create_secret "$SECRETS_DIR/web_password.txt"
 
 if [ -s "$LEGACY_CA_KEY" ]; then
@@ -115,6 +116,7 @@ chmod 640 \
   "$DEPLOY_DIR/mosquitto/acl" \
   "$DEPLOY_DIR/mosquitto/mosquitto.conf" \
   "$SECRETS_DIR/mqtt_backend_password.txt" \
+  "$SECRETS_DIR/command_hmac_key.txt" \
   "$CERTS_DIR/ca.crt" \
   "$CERTS_DIR/server.crt" \
   "$CERTS_DIR/server.key"

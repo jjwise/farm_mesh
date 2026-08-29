@@ -2,9 +2,12 @@
 
 Single-page map UI for:
 
-- current snapshot (`/v1/line/{line_id}/snapshot`)
-- per-tracker historical movement (`/v1/line/{line_id}/history`)
-- optional measurement-density layer
+- a unified pod/tracker/valve/infrastructure map
+- profile filters and node sorting
+- current interpolated pod snapshots and a pod heat layer
+- per-line historical movement
+- basic-tracker position interval changes
+- acknowledged valve open/close commands with bounded duration
 
 In the self-hosted stack, Caddy serves the files and proxies `/api` to
 FastAPI on the same HTTPS origin. FastAPI is not exposed directly.
